@@ -61,10 +61,32 @@ export class PearlGateway {
       return;
     }
 
+    const stopSteps: Array<() => Promise<void>> = [
+      async () => {
+        await this.rpcServer.stop();
+      },
+      async () => {
+        await this.scheduler.stop();
+      },
+      async () => {
+        await this.nodeClient.close();
+      },
+    ];
+
     try {
-      await this.rpcServer.stop();
-      await this.scheduler.stop();
-      await this.nodeClient.close();
+      let firstError: unknown = null;
+      for (const step of stopSteps) {
+        try {
+          await step();
+        } catch (error) {
+          if (!firstError) {
+            firstError = error;
+          }
+        }
+      }
+      if (firstError) {
+        throw firstError;
+      }
     } finally {
       this.running = false;
     }
